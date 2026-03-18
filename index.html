@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro HTML Tester</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/search/searchcursor.min.js"></script>
+
+    <style>
+        /* โครงสร้างพื้นฐาน */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #1e1e1e; color: #ffffff; 
+            display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+            position: relative;
+        }
+
+        /* ส่วนหัว */
+        header { 
+            background-color: #252526; padding: 10px 20px; 
+            border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; 
+        }
+        header h1 { font-size: 1.2rem; color: #ff79c6; }
+
+        /* พื้นที่ทำงาน */
+        .container { display: flex; flex: 1; overflow: hidden; }
+        .panel { flex: 1; display: flex; flex-direction: column; }
+        .editor-panel { border-right: 2px solid #333; }
+        .panel-header { 
+            background-color: #2d2d30; padding: 10px 15px; font-size: 0.9rem; color: #ccc; 
+            display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333;
+        }
+
+        /* ปุ่มเครื่องมือ */
+        .toolbar-btn {
+            background-color: #3e3e42; color: #fff; border: none; padding: 5px 10px; 
+            border-radius: 4px; cursor: pointer; font-size: 0.8rem; margin-left: 5px; transition: background 0.2s;
+        }
+        .toolbar-btn:hover { background-color: #55555a; }
+        .toolbar-btn.active { background-color: #007acc; } 
+        .btn-success { background-color: #2ea043; } .btn-success:hover { background-color: #3fb950; }
+        .btn-info { background-color: #0284c7; } .btn-info:hover { background-color: #0369a1; }
+        .btn-warning { background-color: #d97706; } .btn-warning:hover { background-color: #f59e0b; }
+
+        /* ปรับแต่ง CodeMirror ให้เต็มพื้นที่ */
+        .CodeMirror { flex: 1; height: 100% !important; font-size: 15px; font-family: 'Consolas', monospace; }
+
+        /* พื้นที่แสดงผล (Preview) */
+        .iframe-wrapper { 
+            flex: 1; display: flex; justify-content: center; align-items: center; background-color: #e0e0e0; overflow: hidden;
+        }
+        iframe { width: 100%; height: 100%; background-color: #ffffff; border: none; transition: width 0.3s ease, height 0.3s ease; }
+        .mobile-view { width: 375px; height: 812px; max-height: 100%; border: 10px solid #333; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+
+        /* ------------------------------------ */
+        /* CSS สำหรับกล่องค้นหาแบบพิเศษ (Smart Search) */
+        /* ------------------------------------ */
+        #search-modal {
+            display: none; /* ซ่อนไว้ก่อน */
+            position: absolute; top: 70px; left: 20px;
+            width: 400px; background-color: #252526; border: 1px solid #444; border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 100; padding: 15px;
+        }
+        #search-modal h3 { font-size: 1rem; margin-bottom: 10px; color: #d4d4d4; }
+        #search-input {
+            width: 100%; height: 100px; background-color: #1e1e1e; color: #d4d4d4;
+            border: 1px solid #555; border-radius: 4px; padding: 10px;
+            font-family: 'Consolas', monospace; font-size: 14px; resize: vertical; outline: none;
+        }
+        #search-input:focus { border-color: #007acc; }
+        .search-actions { display: flex; justify-content: flex-end; margin-top: 10px; gap: 10px; }
+        .btn-search-action { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; background: #007acc; }
+        .btn-search-action.cancel { background: #555; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>&#60;/&#62; Pro HTML Tester</h1>
+        <span style="font-size: 0.85rem; color: #888;">ธุรกิจของคุณ สมควรได้รับเครื่องมือที่ดีที่สุด</span>
+    </header>
+
+    <div id="search-modal">
+        <h3>🔍 ค้นหาก้อนโค้ด (วางหลายบรรทัดได้)</h3>
+        <textarea id="search-input" placeholder="วางโค้ดที่ต้องการค้นหาที่นี่..."></textarea>
+        <div class="search-actions">
+            <button class="btn-search-action cancel" onclick="closeSearchModal()">ยกเลิก</button>
+            <button class="btn-search-action" onclick="executeSmartSearch()">ค้นหาโค้ด</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="panel editor-panel">
+            <div class="panel-header">
+                <span>📝 HTML / CSS / JS Editor</span>
+                <div>
+                    <button class="toolbar-btn btn-warning" onclick="openSearchModal()">🔍 ค้นหาโค้ด</button>
+                    <button class="toolbar-btn btn-info" id="btn-copy" onclick="copyCode()">📋 คัดลอก</button>
+                    <button class="toolbar-btn btn-success" onclick="downloadCode()">💾 ดาวน์โหลด</button>
+                </div>
+            </div>
+            <textarea id="code-editor"></textarea>
+        </div>
+
+        <div class="panel preview-panel">
+            <div class="panel-header">
+                <span>👁️ Live Preview</span>
+                <div>
+                    <button class="toolbar-btn active" id="btn-desktop" onclick="setDevice('desktop')">💻 Desktop</button>
+                    <button class="toolbar-btn" id="btn-mobile" onclick="setDevice('mobile')">📱 Mobile</button>
+                    <button class="toolbar-btn" onclick="toggleFullScreen()">⛶ ขยายเต็มจอ</button>
+                </div>
+            </div>
+            <div class="iframe-wrapper" id="iframe-wrapper">
+                <iframe id="preview-frame"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const defaultCode = `<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"><\/script>
+<style>
+    body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #fdfbfb; }
+    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
+    button { width: 100%; padding: 12px; background: #4f46e5; color: white; border: none; border-radius: 8px; cursor: pointer; }
+</style>
+</head>
+<body>
+    <div class="card">
+        <h2>ระบบพิมพ์รายงาน 🖨️</h2>
+        <label>ตั้งแต่วันที่:</label>
+        <input type="date" id="startDate">
+        <label>ถึงวันที่:</label>
+        <input type="date" id="endDate">
+        <button onclick="prepareReport()">พิมพ์รายงาน</button>
+    </div>
+
+    <script>
+        // โค้ดที่คุณต้องการทดสอบการค้นหา
+        function prepareReport() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            
+            if(!start || !end) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'กรุณาเลือกช่วงวันที่',
+                    text: 'กรุณาเลือกตั้งแต่วันที่ และ ถึงวันที่ ก่อนกดพิมพ์รายงานครับ',
+                    confirmButtonColor: '#4f46e5'
+                });
+                return;
+            }
+            
+            Swal.fire('สำเร็จ!', 'กำลังสร้างรายงาน...', 'success');
+        }
+    <\/script>
+</body>
+</html>`;
+
+        const textArea = document.getElementById('code-editor');
+        textArea.value = defaultCode;
+        const editor = CodeMirror.fromTextArea(textArea, {
+            mode: "htmlmixed",
+            theme: "dracula",
+            lineNumbers: true,
+            lineWrapping: true
+        });
+
+        const preview = document.getElementById('preview-frame');
+
+        function updatePreview() {
+            const code = editor.getValue();
+            const iframeDoc = preview.contentDocument || preview.contentWindow.document;
+            iframeDoc.open();
+            iframeDoc.write(code);
+            iframeDoc.close();
+        }
+
+        editor.on("change", updatePreview);
+        updatePreview();
+
+        function setDevice(type) {
+            const btnDesktop = document.getElementById('btn-desktop');
+            const btnMobile = document.getElementById('btn-mobile');
+            if (type === 'mobile') {
+                preview.classList.add('mobile-view');
+                btnMobile.classList.add('active'); btnDesktop.classList.remove('active');
+            } else {
+                preview.classList.remove('mobile-view');
+                btnDesktop.classList.add('active'); btnMobile.classList.remove('active');
+            }
+        }
+
+        function toggleFullScreen() {
+            const wrapper = document.getElementById('iframe-wrapper');
+            if (!document.fullscreenElement) wrapper.requestFullscreen().catch(err => alert(err.message));
+            else document.exitFullscreen();
+        }
+
+        function downloadCode() {
+            const codeContent = editor.getValue();
+            const blob = new Blob([codeContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'my_code.html';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        function copyCode() {
+            navigator.clipboard.writeText(editor.getValue()).then(() => {
+                const copyBtn = document.getElementById('btn-copy');
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '✅ คัดลอกแล้ว'; copyBtn.style.backgroundColor = '#2ea043';
+                setTimeout(() => { copyBtn.innerHTML = originalText; copyBtn.style.backgroundColor = ''; }, 2000);
+            }).catch(err => alert('เกิดข้อผิดพลาด: ' + err));
+        }
+
+        // ==========================================
+        // ระบบค้นหาอัจฉริยะ (Smart Search)
+        // ==========================================
+        const searchModal = document.getElementById('search-modal');
+        const searchInput = document.getElementById('search-input');
+        let lastSearchCursor = null;
+
+        // เปิดหน้าต่างค้นหา
+        function openSearchModal() {
+            searchModal.style.display = 'block';
+            searchInput.focus();
+        }
+
+        // ปิดหน้าต่างค้นหา
+        function closeSearchModal() {
+            searchModal.style.display = 'none';
+        }
+
+        // เริ่มค้นหาโค้ดที่วางลงไป
+        function executeSmartSearch() {
+            let query = searchInput.value.trim();
+            if (!query) return;
+
+            // เคล็ดลับความฉลาด: 
+            // 1. ใส่เครื่องหมาย \ หน้าอักขระพิเศษทางโปรแกรมมิ่ง เพื่อไม่ให้ Regex เข้าใจผิด
+            let escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            
+            // 2. เปลี่ยนช่องว่าง, การกด Tab, และการขึ้นบรรทัดใหม่ ให้กลายเป็นตัวแทน "ช่องว่างใดๆ ก็ได้" (\s+)
+            // เพื่อให้ค้นหาเจอ แม้ก้อนโค้ดต้นฉบับจะมีการเคาะเว้นวรรคไม่เท่ากันก็ตาม
+            let flexibleQuery = escapedQuery.replace(/\s+/g, '\\s+');
+            
+            // สร้างเงื่อนไขการค้นหาแบบละเว้นตัวพิมพ์เล็กใหญ่ (i)
+            let regexPattern = new RegExp(flexibleQuery, 'i');
+
+            // สั่งให้ CodeMirror หาลำดับของข้อความนั้น
+            let cursor = editor.getSearchCursor(regexPattern);
+
+            if (cursor.findNext()) {
+                // ถ้าเจอ ให้คลุมดำ (Highlight) และเลื่อนหน้าจอไปหาตำแหน่งนั้น
+                editor.setSelection(cursor.from(), cursor.to());
+                editor.scrollIntoView({from: cursor.from(), to: cursor.to()}, 100);
+                
+                // ค้นหาเจอแล้ว ปิดหน้าต่างได้เลย
+                closeSearchModal();
+            } else {
+                alert('ไม่พบก้อนโค้ดนี้ในโปรเจ็กต์ครับ ลองตรวจสอบโค้ดที่คัดลอกมาอีกครั้งนะครับ');
+            }
+        }
+    </script>
+</body>
+</html>
